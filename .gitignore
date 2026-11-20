@@ -1,0 +1,7 @@
+.venv/
+.DS_Store
+__pycache__/
+data/processed/*.npz
+data/processed/*.log
+presentation/.vercel/
+CLAUDE.md

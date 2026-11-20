@@ -1,0 +1,125 @@
+{
+ "passes": {
+  "terra_day": 9.98,
+  "terra_night": 21.55,
+  "aqua_day": 14.06,
+  "aqua_night": 2.48
+ },
+ "districts": {
+  "Central and Western": {
+   "terra_day": 26.81,
+   "terra_night": 24.15,
+   "aqua_day": 29.02,
+   "aqua_night": 23.73
+  },
+  "Wan Chai": {
+   "terra_day": 27.95,
+   "terra_night": 24.25,
+   "aqua_day": 29.9,
+   "aqua_night": 23.85
+  },
+  "Eastern": {
+   "terra_day": 27.64,
+   "terra_night": 23.88,
+   "aqua_day": 29.12,
+   "aqua_night": 23.24
+  },
+  "Southern": {
+   "terra_day": 27.49,
+   "terra_night": 24.2,
+   "aqua_day": 28.44,
+   "aqua_night": 24.2
+  },
+  "Yau Tsim Mong": {
+   "terra_day": 29.55,
+   "terra_night": 25.76,
+   "aqua_day": 33.42,
+   "aqua_night": 24.3
+  },
+  "Sham Shui Po": {
+   "terra_day": 30.53,
+   "terra_night": 25.16,
+   "aqua_day": 33.01,
+   "aqua_night": 24.6
+  },
+  "Kowloon City": {
+   "terra_day": 30.43,
+   "terra_night": 25.95,
+   "aqua_day": 33.78,
+   "aqua_night": 24.88
+  },
+  "Wong Tai Sin": {
+   "terra_day": 28.78,
+   "terra_night": 24.49,
+   "aqua_day": 29.33,
+   "aqua_night": 24.17
+  },
+  "Kwun Tong": {
+   "terra_day": 29.37,
+   "terra_night": 25.14,
+   "aqua_day": 31.14,
+   "aqua_night": 24.84
+  },
+  "Kwai Tsing": {
+   "terra_day": 29.63,
+   "terra_night": 24.71,
+   "aqua_day": 32.35,
+   "aqua_night": 24.22
+  },
+  "Tsuen Wan": {
+   "terra_day": 27.01,
+   "terra_night": 22.92,
+   "aqua_day": 27.84,
+   "aqua_night": 22.85
+  },
+  "Tuen Mun": {
+   "terra_day": 28.82,
+   "terra_night": 24.36,
+   "aqua_day": 31.06,
+   "aqua_night": 24.15
+  },
+  "Yuen Long": {
+   "terra_day": 30.23,
+   "terra_night": 24.89,
+   "aqua_day": 33.02,
+   "aqua_night": 24.41
+  },
+  "North": {
+   "terra_day": 28.83,
+   "terra_night": 24.19,
+   "aqua_day": 30.23,
+   "aqua_night": 23.78
+  },
+  "Tai Po": {
+   "terra_day": 27.24,
+   "terra_night": 23.52,
+   "aqua_day": 28.48,
+   "aqua_night": 22.89
+  },
+  "Sha Tin": {
+   "terra_day": 27.74,
+   "terra_night": 23.43,
+   "aqua_day": 29.2,
+   "aqua_night": 22.8
+  },
+  "Sai Kung": {
+   "terra_day": 27.64,
+   "terra_night": 24.25,
+   "aqua_day": 28.59,
+   "aqua_night": 23.78
+  },
+  "Islands": {
+   "terra_day": 27.37,
+   "terra_night": 23.73,
+   "aqua_day": 28.94,
+   "aqua_night": 23.27
+  }
+ },
+ "forest": {
+  "terra_day": 27.48,
+  "terra_night": 23.7,
+  "aqua_day": 28.72,
+  "aqua_night": 23.3
+ },
+ "forest_cells": 371
+}

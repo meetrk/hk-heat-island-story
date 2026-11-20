@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotter Streets, Greener Relief?</title>
+<link href="assets/fonts.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="assets/data.js"></script>
+<style>
+:root{
+  --ink:#07080b; --ink2:#0e1116; --paper:#f3ede4; --dim:#9aa0a8; --faint:#4a4f57;
+  --ember:#ff6a3d; --hot:#ffc857; --cool:#5ec8c4; --leaf:#7fd18b; --magenta:#ff3d73;
+  --serif:"Fraunces",Georgia,serif; --sans:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:var(--paper);overflow:hidden;font-family:var(--sans)}
+#viewport{position:fixed;inset:0;overflow:hidden}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;background:var(--ink);overflow:hidden;transform-origin:center center}
+/* film grain */
+#stage::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:50;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.slide{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .9s ease,visibility 0s .9s}
+.slide.active{opacity:1;visibility:visible;transition:opacity .9s ease}
+/* chrome */
+#chrome-act{position:absolute;top:56px;left:96px;z-index:40;font:500 15px/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--dim);transition:opacity .6s}
+#chrome-num{position:absolute;top:56px;right:96px;z-index:40;font:400 15px/1 var(--mono);color:var(--faint);letter-spacing:.12em}
+#progress{position:absolute;left:96px;right:96px;bottom:48px;height:2px;z-index:40;display:flex;gap:6px}
+#progress span{flex:1;background:#ffffff14;position:relative;overflow:hidden;border-radius:2px}
+#progress span i{position:absolute;inset:0;background:var(--ember);transform:scaleX(0);transform-origin:left;transition:transform .6s ease}
+#progress span.seen i{transform:scaleX(1)}
+#progress span.gap{flex:none;width:18px;background:none}
+/* type */
+.kicker{font:500 16px/1 var(--mono);letter-spacing:.28em;text-transform:uppercase;color:var(--ember)}
+.display{font-family:var(--serif);font-weight:300;letter-spacing:-.02em;line-height:.95}
+.display em{font-style:italic;font-weight:300;color:var(--hot)}
+.lede{font:300 34px/1.35 var(--sans);color:var(--paper);max-width:900px}
+.lede b{font-weight:500;color:var(--hot)}
+.note{font:400 17px/1.5 var(--mono);color:var(--dim)}
+.num{font-family:var(--serif);font-weight:300;font-variant-numeric:lining-nums tabular-nums;letter-spacing:-.03em}
+.unit{font-family:var(--serif);font-weight:300;color:var(--dim)}
+.abs{position:absolute}
+/* entrance motion: elements with .in animate when their slide is active */
+.in{opacity:0;transform:translateY(28px)}
+.slide.active .in{animation:rise 1.1s cubic-bezier(.2,.7,.1,1) forwards;animation-delay:var(--d,0s)}
+.in.fade{transform:none}.slide.active .in.fade{animation-name:fade}
+@keyframes rise{to{opacity:1;transform:none}}
+@keyframes fade{to{opacity:1}}
+@keyframes kenburns{from{transform:scale(1.12) translate(2%,1%)}to{transform:scale(1) translate(0,0)}}
+@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* ---------- title */
+#s-title .bg{position:absolute;right:-80px;top:40px;height:1040px;opacity:0;filter:saturate(1.15)}
+#s-title.active .bg{animation:fade 2.4s ease forwards,kenburns 14s ease-out forwards}
+#s-title .veil{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,var(--ink) 30%,#07080bcc 48%,transparent 75%)}
+#s-title h1{position:absolute;left:96px;top:300px;font-size:168px}
+#s-title .sub{position:absolute;left:100px;top:700px;font:300 30px/1.4 var(--sans);color:var(--dim)}
+#s-title .crew{position:absolute;left:100px;bottom:110px;font:400 15px/1.8 var(--mono);color:var(--faint);letter-spacing:.06em}
+/* ---------- hook */
+#s-hook .bg{position:absolute;right:-120px;top:110px;height:900px;opacity:.0}
+#s-hook.active .bg{animation:fade 2s .4s ease forwards}
+#s-hook .big{position:absolute;left:96px;top:250px;font-size:380px;color:var(--hot);line-height:.8}
+#s-hook .big .unit{font-size:140px;color:var(--ember)}
+#s-hook .lede{position:absolute;left:104px;top:640px;max-width:600px}
+/* ---------- layers */
+#s-layers .stack{position:absolute;left:880px;top:120px;width:900px;height:860px;perspective:2400px}
+#s-layers .layer{position:absolute;left:120px;top:250px;width:620px;transform-style:preserve-3d;transition:transform 1.6s cubic-bezier(.2,.7,.1,1),opacity 1s;opacity:0;
+  transform:rotateX(58deg) rotateZ(-32deg) translateZ(0)}
+#s-layers .layer img{width:100%;display:block;filter:drop-shadow(0 30px 40px #000a)}
+#s-layers.active .layer{opacity:1}
+#s-layers.active .l1{transform:rotateX(58deg) rotateZ(-32deg) translateZ(-300px)}
+#s-layers.active .l2{transform:rotateX(58deg) rotateZ(-32deg) translateZ(0)}
+#s-layers.active .l3{transform:rotateX(58deg) rotateZ(-32deg) translateZ(300px)}
+#s-layers .l1{transition-delay:.2s}#s-layers .l2{transition-delay:.45s}#s-layers .l3{transition-delay:.7s}
+#s-layers .tag{position:absolute;font:500 16px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+#s-layers .tag small{display:block;color:var(--dim);letter-spacing:.04em;text-transform:none;font-weight:400}
+#s-layers h2{position:absolute;left:96px;top:250px;font-size:96px;width:760px}
+#s-layers .lede{position:absolute;left:100px;top:600px;max-width:700px;font-size:30px}
+#s-layers .note{position:absolute;left:100px;top:850px;max-width:640px}
+/* ---------- act cards */
+.act{background:radial-gradient(ellipse at 70% 60%,#1a0e0a 0%,var(--ink) 60%)}
+.act .numeral{position:absolute;right:80px;top:40px;font:300 900px/1 var(--serif);color:transparent;-webkit-text-stroke:2px #ff6a3d55;letter-spacing:-.05em}
+.act h2{position:absolute;left:96px;top:330px;font-size:190px}
+.act .rq{position:absolute;left:100px;top:620px;max-width:1000px;font:300 38px/1.35 var(--serif);font-style:italic;color:var(--paper)}
+.act .rq-label{position:absolute;left:100px;top:575px}
+.act .ember-line{position:absolute;left:100px;top:300px;height:2px;width:0;background:var(--ember)}
+.act.active .ember-line{animation:grow 1.4s .2s cubic-bezier(.2,.7,.1,1) forwards}
+@keyframes grow{to{width:240px}}
+#s-act2{background:radial-gradient(ellipse at 70% 60%,#08201d 0%,var(--ink) 60%)}
+#s-act2 .numeral{-webkit-text-stroke-color:#5ec8c455}#s-act2 .ember-line{background:var(--cool)}#s-act2 .kicker{color:var(--cool)}
+#s-act3{background:radial-gradient(ellipse at 70% 60%,#22091a 0%,var(--ink) 60%)}
+#s-act3 .numeral{-webkit-text-stroke-color:#ff3d7355}#s-act3 .ember-line{background:var(--magenta)}#s-act3 .kicker{color:var(--magenta)}
+/* ---------- map slides */
+.mapwrap{position:absolute;overflow:visible}
+.mapwrap img{position:absolute;inset:0;width:100%;height:100%}
+.mapwrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.legend{position:absolute;font:400 15px/1 var(--mono);color:var(--dim)}
+.legend .bar{height:12px;border-radius:6px;margin:10px 0}
+.side{position:absolute;right:96px;width:520px}
+.stat{margin-bottom:46px}
+.stat .num{font-size:120px;line-height:.9}
+.stat .num .unit{font-size:52px}
+.stat .lab{font:400 18px/1.4 var(--mono);color:var(--dim);margin-top:10px;letter-spacing:.04em}
+/* swipe */
+.swipe{position:absolute;cursor:ew-resize;user-select:none}
+.swipe img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.swipe .top{clip-path:inset(0 0 0 100%)}
+.swipe .handle{position:absolute;top:-20px;bottom:-20px;width:2px;background:var(--paper);left:100%;box-shadow:0 0 24px #fff8}
+.swipe .handle::after{content:"⟷";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:50%;background:var(--paper);color:var(--ink);display:grid;place-items:center;font:500 22px var(--sans)}
+.swipe .yr{position:absolute;top:-6px;font:500 22px/1 var(--mono);letter-spacing:.1em}
+/* charts */
+.chart text{font:400 15px var(--mono);fill:var(--dim)}
+.chart .axis path,.chart .axis line{stroke:#ffffff22}
+/* districts: bar width = area */
+#stripes{position:absolute;left:96px;width:1728px;top:330px;height:520px;cursor:pointer}
+#stripes .bar{position:absolute;bottom:0;border-radius:3px 3px 0 0;transition:left 1.3s cubic-bezier(.65,0,.35,1),width 1.3s cubic-bezier(.65,0,.35,1),height 1.3s cubic-bezier(.65,0,.35,1),background-color 1.3s}
+#stripes .bar span{position:absolute;left:50%;bottom:12px;writing-mode:vertical-rl;transform:translateX(-50%) rotate(180deg);white-space:nowrap;font:500 14px var(--mono);color:#07080bcc;transition:opacity .5s}
+#stripes .bar b{position:absolute;top:-30px;left:50%;transform:translateX(-50%);font:400 15px var(--mono);color:var(--paper);white-space:nowrap;transition:opacity .5s}
+#stripe-mode{position:absolute;left:100px;top:885px;display:flex;gap:28px;font:400 17px var(--mono);color:var(--faint);z-index:5}
+#stripe-mode button{all:unset;cursor:pointer;padding-bottom:6px;border-bottom:2px solid transparent}
+#stripe-mode button.on{color:var(--paper);border-color:var(--cool)}
+#stripe-mode button:focus-visible{outline:2px solid var(--cool);outline-offset:4px}
+#stripe-axis{position:absolute;left:100px;top:935px;font:400 15px var(--mono);color:var(--dim)}
+/* thermometers */
+.thermo{overflow:visible}.thermo text{font:400 18px var(--mono);fill:var(--dim)}
+/* epilogue */
+.take{position:absolute;left:96px;display:flex;gap:44px;align-items:baseline;width:1700px}
+.take .k{font:300 150px/1 var(--serif);width:170px;color:var(--faint)}
+.take .t{font:300 46px/1.25 var(--serif)}
+.take .t b{font-weight:500}
+/* methods */
+#s-method .cols{position:absolute;left:96px;right:96px;top:250px;display:grid;grid-template-columns:repeat(3,1fr);gap:64px}
+#s-method h3{font:500 15px/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--ember);margin-bottom:22px}
+#s-method p,#s-method li{font:300 22px/1.55 var(--sans);color:#d9d3ca}
+#s-method ul{list-style:none}#s-method li{margin-bottom:12px;padding-left:22px;position:relative}
+#s-method li::before{content:"";position:absolute;left:0;top:14px;width:10px;height:2px;background:var(--ember)}
+#s-method .refs{position:absolute;left:96px;right:96px;bottom:100px;font:400 14px/1.7 var(--mono);color:var(--faint)}
+.hint{position:absolute;right:96px;bottom:70px;font:400 14px var(--mono);color:var(--faint);z-index:40}
+
+/* ---------- interaction layer ---------- */
+#tip{position:absolute;left:0;top:0;z-index:60;pointer-events:none;opacity:0;transition:opacity .15s;background:#0e1116ee;border:1px solid #ffffff22;border-radius:10px;padding:14px 18px;font:400 16px/1.6 var(--mono);color:var(--paper);min-width:230px;box-shadow:0 24px 60px #000b}
+#tip b{font:400 34px/1.1 var(--serif);display:block;margin-bottom:6px}
+#tip .k{color:var(--dim)} #tip .row{display:flex;justify-content:space-between;gap:28px}
+#tip .tag{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-bottom:4px}
+.modes{display:flex;gap:28px;font:400 17px var(--mono);color:var(--faint);z-index:5}
+.modes button{all:unset;cursor:pointer;padding-bottom:6px;border-bottom:2px solid transparent;transition:color .3s,border-color .3s}
+.modes button:hover{color:var(--dim)}
+.modes button.on{color:var(--paper);border-color:var(--ember)}
+.modes button:focus-visible{outline:2px solid var(--ember);outline-offset:4px}
+.hov{cursor:crosshair}
+#s-layers .layer{cursor:pointer}
+#s-layers .stack.f .layer{opacity:.12}
+#s-layers .stack.f .layer.on{opacity:1}
+#s-layers .stack.f .tag{opacity:.3}#s-layers .stack.f .tag.on{opacity:1}
+.mk{position:absolute;width:30px;height:30px;border:2px solid #fff;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0;box-shadow:0 0 18px #fff8;transition:opacity .15s}
+/* ---------- 24-hour sky ---------- */
+#s-day{background:#03040d}
+#s-day canvas{position:absolute;inset:0}
+#day-clock{position:absolute;left:96px;top:150px;font:300 190px/0.9 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums;text-shadow:0 6px 40px #0008}
+#day-read{position:absolute;left:104px;top:345px;font:300 38px/1.3 var(--serif);text-shadow:0 4px 24px #000a}
+#day-read b{font-weight:500;color:var(--hot)}
+#day-read small{display:block;font:400 18px/1.6 var(--mono);color:#d9d3ca;margin-top:6px}
+#day-ctrl{position:absolute;right:96px;top:160px;display:flex;gap:16px;align-items:center;z-index:5}
+#day-ctrl select,#day-ctrl button{all:unset;cursor:pointer;font:400 18px var(--mono);color:var(--paper);background:#07080bb3;border:1px solid #ffffff2a;border-radius:999px;padding:12px 22px;backdrop-filter:blur(6px)}
+#day-ctrl select{padding-right:44px;background-image:linear-gradient(45deg,transparent 50%,#f3ede4 50%),linear-gradient(135deg,#f3ede4 50%,transparent 50%);background-position:calc(100% - 24px) 50%,calc(100% - 18px) 50%;background-size:6px 6px;background-repeat:no-repeat}
+#day-ctrl select option{background:#0e1116;color:#f3ede4}
+#day-ctrl :focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+#day-chart{position:absolute;left:96px;top:660px;cursor:ew-resize}
+#day-note{position:absolute;left:100px;top:985px;font:400 15px var(--mono);color:var(--dim)}
+@media (prefers-reduced-motion: reduce){.slide,.in,#stripes .bar{transition:none!important;animation:none!important;opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+
+<div id="chrome-act"></div><div id="chrome-num"></div><div id="progress"></div>
+
+<!-- ======================= PROLOGUE ======================= -->
+<section class="slide" id="s-title" data-act="">
+  <img class="bg" src="assets/lst_2024-25.png" alt="">
+  <div class="veil"></div>
+  <div class="kicker abs in" style="left:100px;top:240px;--d:.3s">CCST9083 · Earth as Seen by Satellite</div>
+  <h1 class="display in" style="--d:.5s">Hotter streets,<br><em>greener relief?</em></h1>
+  <div class="sub in" style="--d:.9s">Hong Kong's urban heat island, read from 705 km up · 2014–2025</div>
+  <div class="crew in fade" style="--d:1.4s">Feng Yujie · Meet Kachhadiya · Tony Tse · Song Yixuan · Liu Yangfan · Wong Ching Him</div>
+</section>
+
+<section class="slide" id="s-hook" data-act="Prologue">
+  <img class="bg" src="assets/hotspots_2024.png" alt="">
+  <div class="kicker abs in" style="left:100px;top:200px">A summer morning, 10:30</div>
+  <div class="big num in" style="--d:.2s"><span data-count="epochs.2024-25.uhi_intensity" data-dec="1">0</span><span class="unit">°C</span></div>
+  <p class="lede in" style="--d:.6s" id="hook-lede"></p>
+</section>
+
+<section class="slide" id="s-layers" data-act="Prologue · How we looked">
+  <div class="kicker abs in" style="left:100px;top:200px">Method</div>
+  <h2 class="display in" style="--d:.1s">One satellite.<br><em>One grid.</em></h2>
+  <p class="lede in" style="--d:.3s">Heat, greenery and concrete all come from <b>Landsat 8/9</b>, on the same <b>30 m pixels</b>, so each pixel can be compared with itself.</p>
+  <p class="note in" style="--d:.5s">Finer land-cover maps (10 m) are averaged up to 30 m.<br>MODIS (1 km) appears in pictures only, never in the statistics.</p>
+  <div class="stack">
+    <div class="layer l1"><img src="assets/ndbi_2024.png" alt=""></div>
+    <div class="layer l2"><img src="assets/ndvi_2024.png" alt=""></div>
+    <div class="layer l3"><img src="assets/lst_2024-25.png" alt=""></div>
+    <div class="tag in" data-l="l3" style="right:-10px;top:90px;color:var(--hot);--d:1.4s">Heat · LST<small>thermal band 10</small></div>
+    <div class="tag in" data-l="l2" style="right:-10px;top:400px;color:var(--leaf);--d:1.6s">Green · NDVI<small>red + near-infrared</small></div>
+    <div class="tag in" data-l="l1" style="right:-10px;top:700px;color:#c9d1d9;--d:1.8s">Concrete · NDBI<small>shortwave + near-infrared</small></div>
+  </div>
+</section>
+
+<!-- ======================= ACT I ======================= -->
+<section class="slide act" id="s-act1" data-act="Act I">
+  <div class="numeral in fade" style="--d:.1s">I</div>
+  <div class="ember-line"></div>
+  <h2 class="display in" style="--d:.3s">The <em>fever</em></h2>
+  <div class="kicker rq-label in" style="--d:.6s">Research question 1</div>
+  <p class="rq in" style="--d:.7s">How have the intensity and the reach of Hong Kong's daytime heat island changed between 2014 and 2025?</p>
+</section>
+
+<section class="slide" id="s-portrait" data-act="Act I · The fever">
+  <div class="mapwrap in fade" id="portrait-map" style="left:70px;top:110px;width:1180px;height:876px;--d:.1s">
+    <img src="assets/lst_2024-25.png" alt="Land surface temperature summer 2024-25"><svg></svg>
+  </div>
+  <div class="side" style="top:220px">
+    <div class="kicker in" style="margin-bottom:28px;--d:.3s">Summer 2024–25 · thermal portrait</div>
+    <div class="stat in" style="--d:.5s"><div class="num" style="color:var(--hot)"><span data-count="epochs.2024-25.urban_lst" data-dec="1">0</span><span class="unit">°C</span></div><div class="lab">Dense built-up ground</div></div>
+    <div class="stat in" style="--d:.7s"><div class="num" style="color:var(--cool)"><span data-count="epochs.2024-25.rural_lst" data-dec="1">0</span><span class="unit">°C</span></div><div class="lab">Lowland forest, same morning</div></div>
+    <div class="legend in" style="position:relative;width:420px;--d:.9s"><div style="display:flex;justify-content:space-between"><span id="leg-lo"></span><span>surface °C</span><span id="leg-hi"></span></div><div class="bar" style="background:linear-gradient(90deg,#000004,#420a68,#932667,#dd513a,#fca50a,#fcffa4)"></div></div>
+  </div>
+</section>
+
+<section class="slide" id="s-swipe" data-act="Act I · The fever">
+  <div class="swipe" id="swipe1" style="left:70px;top:130px;width:1130px;height:839px">
+    <img class="bottom" src="assets/lst_2014-15.png" alt="2014-15"><img class="top" src="assets/lst_2024-25.png" alt="2024-25">
+    <div class="handle"></div>
+    <div class="yr" style="left:10px;color:var(--dim)">2014–15</div><div class="yr" style="right:10px;color:var(--hot)">2024–25</div>
+  </div>
+  <div class="side" style="top:230px">
+    <div class="kicker in" style="margin-bottom:28px">A decade apart · drag to compare</div>
+    <div class="stat in" style="--d:.3s"><div class="num"><span data-count="epochs.2014-15.uhi_intensity" data-dec="1">0</span><span class="unit">°C</span> <span class="unit" style="font-size:60px">→</span> <span style="color:var(--hot)" data-count="epochs.2024-25.uhi_intensity" data-dec="1">0</span><span class="unit">°C</span></div><div class="lab">Heat-island intensity<br>(urban minus forest)</div></div>
+    <div class="stat in" style="--d:.5s"><div class="num"><span data-count="epochs.2014-15.hotspot_km2" data-dec="0">0</span> <span class="unit" style="font-size:60px">→</span> <span style="color:var(--hot)" data-count="epochs.2024-25.hotspot_km2" data-dec="0">0</span><span class="unit"> km²</span></div><div class="lab">Hot-spot area<br>(more than 1 SD above the city mean)</div></div>
+  </div>
+</section>
+
+<section class="slide" id="s-warm" data-act="Act I · The fever">
+  <div class="kicker abs in" style="left:100px;top:170px">Where the heat grew · 2014–15 → 2024–25</div>
+  <h2 class="display abs" id="warm-title" style="left:96px;top:205px;font-size:52px;width:1720px;white-space:nowrap;transition:opacity .4s"></h2>
+  <svg class="chart abs" id="warm" style="left:96px;top:300px" width="1728" height="620"></svg>
+  <div class="modes abs" id="warm-mode" style="left:100px;top:950px" data-ix>
+    <button type="button" data-m="rel">Beyond the Hong Kong average</button>
+    <button type="button" data-m="rel_built">Built-up ground, beyond average</button>
+    <button type="button" data-m="dlst">Raw change</button>
+  </div>
+</section>
+
+<section class="slide" id="s-pulse" data-act="Act I · The fever">
+  <div class="kicker abs in" style="left:100px;top:170px">The pulse · 2014–2025</div>
+  <h2 class="display abs in" id="pulse-title" style="left:96px;top:215px;font-size:84px;width:1500px;--d:.1s"></h2>
+  <svg class="chart abs" id="pulse" style="left:96px;top:380px" width="1728" height="560"></svg>
+  <p class="note abs in" id="pulse-note" style="left:100px;top:960px;--d:1.5s"></p>
+</section>
+
+<section class="slide" id="s-night" data-act="Act I · After dark">
+  <div class="kicker abs in" style="left:100px;top:170px">MODIS 1 km · for looking, not for measuring</div>
+  <h2 class="display abs in" style="left:96px;top:215px;font-size:84px;--d:.1s">After sunset, <em>the city keeps its heat</em></h2>
+  <figure class="abs in mfig" data-k="day" style="left:150px;top:350px;width:760px;--d:.4s"><i class="mk"></i><img class="hov" src="assets/modis_day.png" style="width:100%;image-rendering:pixelated;border-radius:4px" alt=""><figcaption class="note" style="margin-top:14px">Day · ~10:30 · <span id="md-range"></span></figcaption></figure>
+  <figure class="abs in mfig" data-k="night" style="left:1010px;top:350px;width:760px;--d:.7s"><i class="mk"></i><img class="hov" src="assets/modis_night.png" style="width:100%;image-rendering:pixelated;border-radius:4px" alt=""><figcaption class="note" style="margin-top:14px">Night · ~22:30 · <span id="mn-range"></span></figcaption></figure>
+</section>
+
+<section class="slide" id="s-day" data-act="Act I · A day in a district">
+  <canvas id="sky" width="1920" height="1080"></canvas>
+  <div id="day-clock">14:00</div>
+  <div id="day-read"></div>
+  <div id="day-ctrl" data-ix>
+    <select id="day-district" aria-label="District"></select>
+    <button type="button" id="day-play" aria-label="Play or pause the day">❚❚ Pause</button>
+  </div>
+  <svg class="chart" id="day-chart" width="1728" height="310" data-ix></svg>
+  <div id="day-note">● satellite pass (MODIS Terra ≈10:00 · 21:30, Aqua ≈14:00 · 02:30), summer 2024, 1 km · the line between passes is interpolated · drag to scrub</div>
+</section>
+
+<!-- ======================= ACT II ======================= -->
+<section class="slide act" id="s-act2" data-act="Act II">
+  <div class="numeral in fade" style="--d:.1s">II</div>
+  <div class="ember-line"></div>
+  <h2 class="display in" style="--d:.3s">The <em style="color:var(--cool)">shade</em></h2>
+  <div class="kicker rq-label in" style="--d:.6s">Research question 2</div>
+  <p class="rq in" style="--d:.7s">How strongly does surface heat follow greenery and concrete, and how much cooler are parks than the streets around them?</p>
+</section>
+
+<section class="slide" id="s-scatter" data-act="Act II · The shade">
+  <svg class="chart abs" id="scatter" style="left:70px;top:120px" width="1150" height="880"></svg>
+  <div class="side" style="top:260px">
+    <div class="kicker in" style="color:var(--cool);margin-bottom:30px;--d:.2s">Every dot is a 30 m pixel</div>
+    <div class="stat in" style="--d:1.6s"><div class="num" style="font-size:150px;color:var(--cool);white-space:nowrap">r = <span id="r-ndvi"></span></div><div class="lab"><span id="scatter-what">Heat vs greenness (NDVI)</span><br><span id="scatter-n"></span></div></div>
+    <p class="lede in" style="font-size:32px;--d:2s" id="scatter-lede"></p>
+    <div class="modes in" id="scatter-mode" style="margin-top:40px;--d:2.2s" data-ix><button type="button" data-m="ndvi" class="on">vs greenness</button><button type="button" data-m="ndbi">vs concrete</button></div>
+  </div>
+</section>
+
+<section class="slide" id="s-tug" data-act="Act II · The shade">
+  <div class="kicker abs in" style="left:100px;top:170px;color:var(--cool)">Leaf against concrete</div>
+  <h2 class="display abs in" id="tug-title" style="left:96px;top:215px;font-size:84px;width:1700px;--d:.1s"></h2>
+  <svg class="chart abs" id="tug" style="left:96px;top:420px" width="1728" height="420"></svg>
+  <p class="note abs in" id="tug-note" style="left:100px;top:900px;--d:1.4s"></p>
+</section>
+
+<section class="slide" id="s-parks" data-act="Act II · The shade">
+  <div class="kicker abs in" style="left:100px;top:170px;color:var(--cool)">The shadow of a park</div>
+  <h2 class="display abs in" id="parks-title" style="left:96px;top:215px;font-size:84px;width:1700px;--d:.1s"></h2>
+  <svg class="chart abs" id="parkcurve" style="left:96px;top:390px" width="1080" height="560"></svg>
+  <div class="abs" id="parklist" style="left:1260px;top:420px;width:560px"></div>
+</section>
+
+<section class="slide" id="s-stripes" data-act="Act II · The shade">
+  <div class="kicker abs in" style="left:100px;top:170px;color:var(--cool)">Eighteen districts · bar width is area</div>
+  <h2 class="display abs" id="stripes-title" style="left:96px;top:205px;font-size:64px;width:1700px;transition:opacity .5s"></h2>
+  <div id="stripes"></div>
+  <div id="stripe-mode"><button id="sm-all" type="button">Whole district</button><button id="sm-built" type="button">Built-up ground only</button></div>
+  <div id="stripe-axis"></div>
+</section>
+
+<!-- ======================= ACT III ======================= -->
+<section class="slide act" id="s-act3" data-act="Act III">
+  <div class="numeral in fade" style="--d:.1s">III</div>
+  <div class="ember-line"></div>
+  <h2 class="display in" style="--d:.3s">The new <em style="color:var(--magenta)">frontier</em></h2>
+  <div class="kicker rq-label in" style="--d:.6s">Research question 3</div>
+  <p class="rq in" style="--d:.7s">Has turning farmland and fishponds into the Northern Metropolis made the ground measurably hotter than land left alone?</p>
+</section>
+
+<section class="slide" id="s-change" data-act="Act III · The new frontier">
+  <div class="mapwrap in fade" style="left:70px;top:150px;width:1200px;--d:.1s" id="change-wrap"><img src="assets/change_nm.png" alt="Land change in the Northern Metropolis" style="position:relative;width:100%;height:auto"></div>
+  <div class="side" style="top:240px">
+    <div class="kicker in" style="color:var(--magenta);margin-bottom:28px;--d:.3s">Northern Metropolis · 2014–15 → 2024–25</div>
+    <div class="stat in" style="--d:.5s"><div class="num" style="color:var(--magenta)"><span data-count="q3.northern_metropolis.developed_km2" data-dec="1">0</span><span class="unit"> km²</span></div><div class="lab">turned from green to built</div></div>
+    <div class="legend in" style="position:relative;--d:.8s;line-height:2.2">
+      <div><span style="display:inline-block;width:14px;height:14px;background:#ff3d73;margin-right:12px;vertical-align:-2px"></span>newly built</div>
+      <div><span style="display:inline-block;width:14px;height:14px;background:#4dd9b3;margin-right:12px;vertical-align:-2px"></span>greened</div>
+      <div><span style="display:inline-block;width:14px;height:14px;background:#40454d;margin-right:12px;vertical-align:-2px"></span>unchanged</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s-nmswipe" data-act="Act III · The new frontier">
+  <div class="swipe" id="swipe2" style="left:90px;top:190px;width:1080px">
+    <img class="bottom" src="assets/nm_lst_2014-15.png" alt="2014-15"><img class="top" src="assets/nm_lst_2024-25.png" alt="2024-25">
+    <div class="handle"></div>
+    <div class="yr" style="left:10px;top:-40px;color:var(--dim)">2014–15</div><div class="yr" style="right:10px;top:-40px;color:var(--hot)">2024–25</div>
+  </div>
+  <svg class="thermo abs" id="thermo" style="left:1340px;top:150px" width="500" height="820"></svg>
+</section>
+
+<!-- ======================= EPILOGUE ======================= -->
+<section class="slide" id="s-epilogue" data-act="Epilogue">
+  <div class="kicker abs in" style="left:100px;top:170px">What the satellite told us</div>
+  <div class="take in" style="top:260px;--d:.2s"><div class="k">1</div><div class="t" id="take1"></div></div>
+  <div class="take in" style="top:500px;--d:.6s"><div class="k">2</div><div class="t" id="take2"></div></div>
+  <div class="take in" style="top:740px;--d:1s"><div class="k">3</div><div class="t" id="take3"></div></div>
+</section>
+
+<section class="slide" id="s-method" data-act="Behind the pictures">
+  <div class="kicker abs" style="left:100px;top:170px">Method, honestly</div>
+  <div class="cols">
+    <div><h3>Data</h3><ul id="m-data"></ul></div>
+    <div><h3>Analysis</h3><ul id="m-analysis"></ul></div>
+    <div><h3>Limits</h3><ul id="m-limits"></ul></div>
+  </div>
+  <div class="refs">Avdan &amp; Jovanovska (2016) J. Sensors · Nichol et al. (2009) Atmos. Res. · Oke (1982) QJRMS · Voogt &amp; Oke (2003) RSE · Weng, Lu &amp; Schubring (2004) RSE · Zha, Gao &amp; Ni (2003) IJRS<br>Data: USGS Landsat C2 L2, ESA WorldCover, Impact Observatory LULC, Copernicus DEM, NASA MODIS via Microsoft Planetary Computer · boundaries and parks © OpenStreetMap contributors</div>
+</section>
+
+<div class="hint">← → to move · F fullscreen</div>
+</div></div>
+
+<script>
+const U = window.UHI;
+const get = p => p.split('.').reduce((o, k) => o == null ? o : o[k], U);
+const f1 = x => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(1);
+const abs1 = x => Math.abs(x).toFixed(1);
+const E24 = U.epochs['2024-25'], E14 = U.epochs['2014-15'];
+const NM = U.q3.northern_metropolis, Q2 = U.q2, T = U.q1_trend;
+const heat = t => d3.interpolateInferno(Math.max(0, Math.min(1, t)));
+const [LO, HI] = U.lst_scale;
+
+/* ---------- copy that depends on the numbers ---------- */
+document.getElementById('hook-lede').innerHTML =
+  `That is how much hotter Hong Kong's <b>concrete</b> runs than its <b>lowland forest</b>, measured from orbit on the same summer mornings.`;
+document.getElementById('leg-lo').textContent = LO + '°';
+document.getElementById('leg-hi').textContent = HI + '°';
+document.getElementById('md-range').textContent = `${U.modis_range.day[0]}–${U.modis_range.day[1]} °C`;
+document.getElementById('mn-range').textContent = `${U.modis_range.night[0]}–${U.modis_range.night[1]} °C`;
+{
+  const s = T.slope_per_decade, p = T.p_value;
+  const sig = p != null && p < 0.05;
+  document.getElementById('pulse-title').innerHTML = sig
+    ? `The heat island ${s > 0 ? 'grew' : 'eased'} by <em>${abs1(s)} °C per decade</em>`
+    : `Year to year it flickers; <em>the gap never closes</em>`;
+  document.getElementById('pulse-note').textContent =
+    `Median urban-minus-forest LST per summer, from ${T.scenes_used} clear Landsat scenes · trend ${f1(s)} °C/decade, p = ${p}`;
+}
+document.getElementById('r-ndvi').textContent = Q2.r_ndvi.toFixed(2).replace('-', '−');
+document.getElementById('scatter-n').textContent = `${Q2.sample_n.toLocaleString()}-pixel stratified sample · all land pixels: r = ${Q2.r_ndvi_all_pixels.toFixed(2).replace('-', '−')}`;
+document.getElementById('scatter-lede').innerHTML = `The greener the pixel, the cooler the ground. <b>R² = ${Q2.ols.r2.toFixed(2)}</b> once concrete is added.`;
+document.getElementById('tug-title').innerHTML = Math.abs(Q2.ols.std_b_ndbi) > Math.abs(Q2.ols.std_b_ndvi)
+  ? `Concrete pushes harder <em>than leaves pull</em>`
+  : `Leaves pull harder <em style="color:var(--cool)">than concrete pushes</em>`;
+document.getElementById('tug-note').textContent =
+  `Standardised coefficients, LST = a + b·NDVI + c·NDBI · b = ${Q2.ols.b_ndvi} °C per NDVI unit, c = ${Q2.ols.b_ndbi} °C per NDBI unit · R² = ${Q2.ols.r2}`;
+document.getElementById('parks-title').innerHTML =
+  `Parks run <em style="color:var(--cool)">${abs1(Q2.park_mean_cooling)} °C cooler</em> than the streets around them`;
+
+document.getElementById('take1').innerHTML =
+  `On summer mornings Hong Kong's built-up ground runs <b style="color:var(--hot)">${abs1(E24.uhi_intensity)} °C</b> hotter than its lowland forest. The gap held all decade: it was ${abs1(E14.uhi_intensity)} °C in 2014–15.`;
+document.getElementById('take2').innerHTML =
+  `Concrete drives the heat more than missing greenery does, yet green still cools: parks run <b style="color:var(--cool)">${abs1(Q2.park_mean_cooling)} °C</b> cooler than the streets around them.`;
+document.getElementById('take3').innerHTML =
+  `Where the Northern Metropolis replaced green with concrete, the ground warmed <b style="color:var(--magenta)">${f1(NM.development_warming)} °C</b> more than land left alone.`;
+const li = (id, arr) => document.getElementById(id).innerHTML = arr.map(x => `<li>${x}</li>`).join('');
+li('m-data', [
+  `Landsat 8/9 Collection 2 Level-2, May–Oct, three epochs (${E14.n_scenes}, ${U.epochs['2019-20'].n_scenes}, ${E24.n_scenes} scenes) plus ${T.scenes_used} scenes for the trend`,
+  `All layers on one 30 m grid (UTM 50N). WorldCover and IO land cover averaged from 10 m to 30 m`,
+  `LST from ST_B10; the NDVI-emissivity tutorial method gives the same pattern (r = ${E24.tutorial_check.r_vs_usgs}), but reads ~${abs1(E24.tutorial_check.mean_diff)} °C lower because it uses uncorrected at-sensor radiance`]);
+li('m-analysis', [
+  `UHI = mean LST of ≥80 % built-up pixels minus ≥80 % forest below 200 m`,
+  `Stratified sample of ${Q2.sample_n} pixels; Pearson r and OLS LST ~ NDVI + NDBI`,
+  `Development = NDBI up >0.08 and NDVI down >0.10; warming vs unchanged pixels, 95 % CI ${NM.ci95[0].toFixed(1)}–${NM.ci95[1].toFixed(1)} °C from a spatial block bootstrap`]);
+li('m-limits', [
+  `Surface temperature, not the air people breathe`,
+  `Landsat sees Hong Kong at ~10:30 only; night appears through MODIS pictures, not numbers`,
+  `Thermal band is natively 100 m; summer clouds thin the record`,
+  `Northern Metropolis outline is approximate`]);
+
+/* ---------- count-up numbers ---------- */
+function countUp(slide) {
+  slide.querySelectorAll('[data-count]').forEach(el => {
+    const target = get(el.dataset.count), dec = +el.dataset.dec || 0;
+    if (target == null) { el.textContent = '–'; return; }
+    const t0 = performance.now(), dur = 1600;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+      el.textContent = (target * e).toFixed(dec);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/* ---------- map overlays ---------- */
+function portraitOverlay() {
+  const ov = U.overlays, svg = d3.select('#portrait-map svg').attr('viewBox', `0 0 ${ov.w} ${ov.h}`);
+  svg.selectAll('*').remove();
+  svg.selectAll('path').data(ov.districts).join('path').attr('d', d => d.d)
+    .attr('fill', 'none').attr('stroke', '#ffffff1c').attr('stroke-width', 1.2);
+  const hot = E24.districts.slice(0, 3).map(d => d.name);
+  const lab = svg.selectAll('g.l').data(ov.districts.filter(d => hot.includes(d.name))).join('g')
+    .attr('transform', d => `translate(${d.cx},${d.cy})`).style('opacity', 0);
+  lab.append('circle').attr('r', 6).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 2);
+  const off = [[-220, -170], [230, -40], [-60, 210]];
+  const o = d => off[hot.indexOf(d.name)];
+  lab.append('line').attr('x1', 0).attr('y1', 0).attr('x2', d => o(d)[0] * .82).attr('y2', d => o(d)[1] * .82).attr('stroke', '#fff8');
+  lab.append('text').attr('x', d => o(d)[0]).attr('y', d => o(d)[1]).attr('text-anchor', d => o(d)[0] < 0 ? 'end' : 'start').text(d => `${d.name} · ${E24.districts.find(x => x.name === d.name).lst.toFixed(1)}°`)
+    .attr('fill', '#fff').style('font', '500 30px Inter');
+  lab.transition().delay((d, i) => 1200 + i * 300).duration(800).style('opacity', 1);
+}
+
+/* ---------- swipe ---------- */
+function setupSwipe(id, aspectSrc) {
+  const el = document.getElementById(id), top = el.querySelector('.top'), h = el.querySelector('.handle');
+  const img = el.querySelector('.bottom');
+  const fit = () => { if (img.naturalWidth) el.style.height = (el.offsetWidth * img.naturalHeight / img.naturalWidth) + 'px'; };
+  img.complete ? fit() : img.addEventListener('load', fit);
+  const set = p => { p = Math.max(0, Math.min(100, p)); top.style.clipPath = `inset(0 0 0 ${p}%)`; h.style.left = p + '%'; };
+  let drag = false;
+  const move = e => {
+    const r = el.getBoundingClientRect();
+    set((e.clientX - r.left) / r.width * 100);
+  };
+  el.addEventListener('pointerdown', e => { drag = true; el.setPointerCapture(e.pointerId); move(e); e.stopPropagation(); });
+  el.addEventListener('pointermove', e => drag && move(e));
+  el.addEventListener('pointerup', () => drag = false);
+  el.addEventListener('click', e => e.stopPropagation());
+  el.play = () => { set(100); const t0 = performance.now();
+    const step = now => { const k = Math.min(1, (now - t0 - 600) / 2200); if (k > 0) set(100 - 52 * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step); };
+  return el;
+}
+const swipes = { 's-swipe': setupSwipe('swipe1'), 's-nmswipe': setupSwipe('swipe2') };
+
+/* ---------- pulse (trend) ---------- */
+function drawPulse() {
+  const svg = d3.select('#pulse'); svg.selectAll('*').remove();
+  const W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 70, r: 40, t: 20, b: 50};
+  const ys = T.yearly, sc = T.scenes.map(s => ({x: +s.date.slice(0, 4) + (+s.date.slice(5, 7) - 1) / 12, y: s.uhi}));
+  const x = d3.scaleLinear([2013.6, 2026], [m.l, W - m.r]);
+  const yv = d3.extent([...sc.map(d => d.y), ...ys.map(d => d.uhi)]);
+  const y = d3.scaleLinear([Math.min(0, yv[0] - 0.5), yv[1] + 0.5], [H - m.b, m.t]).nice();
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(12).tickFormat(d3.format('d')).tickSize(0)).selectAll('text').attr('dy', 18);
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat(d => d + '°')).call(g => g.select('.domain').remove()).selectAll('line').attr('stroke', '#ffffff10');
+  svg.append('g').selectAll('circle').data(sc).join('circle').attr('cx', d => x(d.x)).attr('cy', d => y(d.y)).attr('r', 0)
+    .attr('fill', d => heat(0.3 + d.y / 20)).attr('opacity', .5)
+    .transition().delay((d, i) => 300 + i * 6).duration(400).attr('r', 4);
+  const line = d3.line().x(d => x(d.year + 0.5)).y(d => y(d.uhi)).curve(d3.curveMonotoneX);
+  const gap = d3.area().x(d => x(d.year + 0.5)).y0(y(0)).y1(d => y(d.uhi)).curve(d3.curveMonotoneX);
+  const ga = svg.append('defs').append('linearGradient').attr('id', 'gapg').attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', 1);
+  ga.append('stop').attr('offset', '0%').attr('stop-color', '#ff6a3d').attr('stop-opacity', .35);
+  ga.append('stop').attr('offset', '100%').attr('stop-color', '#ff6a3d').attr('stop-opacity', 0);
+  svg.append('path').datum(ys).attr('d', gap).attr('fill', 'url(#gapg)').style('opacity', 0).transition().delay(2600).duration(1400).style('opacity', 1);
+  const mid = ys[Math.floor(ys.length / 2)];
+  svg.append('text').attr('x', x(mid.year + 0.5)).attr('y', (y(0) + y(mid.uhi)) / 2).attr('text-anchor', 'middle')
+    .text('the gap: city minus forest').style('font', '300 italic 34px Fraunces').style('fill', '#ffc857').style('opacity', 0)
+    .transition().delay(3000).duration(1000).style('opacity', .9);
+  const p = svg.append('path').datum(ys).attr('d', line).attr('fill', 'none').attr('stroke', 'url(#pg)').attr('stroke-width', 5)
+    .style('filter', 'drop-shadow(0 0 10px #ff6a3d)');
+  const g = svg.append('defs').append('linearGradient').attr('id', 'pg');
+  g.append('stop').attr('offset', '0%').attr('stop-color', '#ffc857'); g.append('stop').attr('offset', '100%').attr('stop-color', '#ff3d3d');
+  const L = p.node().getTotalLength();
+  p.attr('stroke-dasharray', L).attr('stroke-dashoffset', L).transition().delay(800).duration(2400).ease(d3.easeCubicInOut).attr('stroke-dashoffset', 0);
+  svg.append('g').selectAll('circle').data(ys).join('circle').attr('cx', d => x(d.year + 0.5)).attr('cy', d => y(d.uhi))
+    .attr('r', 0).attr('fill', '#fff').transition().delay((d, i) => 900 + i * 200).attr('r', 7);
+  svg.append('text').attr('x', m.l).attr('y', m.t - 4).text('urban − forest, °C').style('fill', '#9aa0a8');
+}
+
+/* ---------- scatter ---------- */
+function drawScatter() {
+  const svg = d3.select('#scatter'); svg.selectAll('*').remove();
+  const W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 90, r: 30, t: 30, b: 80};
+  const pts = Q2.sample.map(d => ({n: d[0], b: d[1], t: d[2]}));
+  const x = d3.scaleLinear([-0.1, 0.9], [m.l, W - m.r]);
+  const y = d3.scaleLinear(d3.extent(pts, d => d.t), [H - m.b, m.t]).nice();
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5).tickSize(0)).selectAll('text').attr('dy', 18);
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickSize(0).tickFormat(d => d + '°')).call(g => g.select('.domain').remove());
+  svg.append('text').attr('x', W - m.r).attr('y', H - 20).attr('text-anchor', 'end').text('greenness (NDVI) →');
+  svg.append('text').attr('x', m.l).attr('y', m.t - 8).text('surface temperature');
+  svg.append('g').selectAll('circle').data(pts).join('circle')
+    .attr('cx', W / 2).attr('cy', H / 2).attr('r', 0).attr('fill', d => heat((d.t - LO) / (HI - LO))).attr('opacity', .75)
+    .transition().delay(() => Math.random() * 1200).duration(1200).ease(d3.easeCubicOut)
+    .attr('cx', d => x(d.n)).attr('cy', d => y(d.t)).attr('r', 3.6);
+  const c = Q2.ndvi_curve.filter(d => d.ndvi >= 0 && d.ndvi <= 0.9);
+  const p = svg.append('path').datum(c).attr('fill', 'none').attr('stroke', '#5ec8c4').attr('stroke-width', 6)
+    .attr('d', d3.line().x(d => x(d.ndvi)).y(d => y(d.lst)).curve(d3.curveBasis)).style('filter', 'drop-shadow(0 0 12px #5ec8c4)');
+  const L = p.node().getTotalLength();
+  p.attr('stroke-dasharray', L).attr('stroke-dashoffset', L).transition().delay(1500).duration(1800).attr('stroke-dashoffset', 0);
+}
+
+/* ---------- tug of war ---------- */
+function drawTug() {
+  const svg = d3.select('#tug'); svg.selectAll('*').remove();
+  const W = +svg.attr('width'), H = +svg.attr('height'), cx = W / 2;
+  const bn = Q2.ols.std_b_ndvi, bb = Q2.ols.std_b_ndbi, mx = Math.max(Math.abs(bn), Math.abs(bb)) * 1.1;
+  const s = d3.scaleLinear([0, mx], [0, W / 2 - 160]);
+  svg.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', H).attr('stroke', '#ffffff30');
+  const rows = [{k: 'Greenness · NDVI', v: bn, c: '#5ec8c4', y: 90}, {k: 'Concrete · NDBI', v: bb, c: '#ff6a3d', y: 270}];
+  rows.forEach((r, i) => {
+    const w = s(Math.abs(r.v)), left = r.v < 0;
+    svg.append('rect').attr('x', cx).attr('y', r.y - 40).attr('height', 80).attr('width', 0).attr('rx', 4).attr('fill', r.c)
+      .style('filter', `drop-shadow(0 0 18px ${r.c})`)
+      .transition().delay(500 + i * 400).duration(1400).ease(d3.easeCubicOut).attr('x', left ? cx - w : cx).attr('width', w);
+    svg.append('text').attr('x', left ? cx + 24 : cx - 24).attr('y', r.y + 10).attr('text-anchor', left ? 'start' : 'end')
+      .text(r.k).style('font', '400 30px Fraunces').style('fill', '#f3ede4');
+    svg.append('text').attr('x', left ? cx - w - 20 : cx + w + 20).attr('y', r.y + 14).attr('text-anchor', left ? 'end' : 'start')
+      .text((r.v > 0 ? '+' : '−') + Math.abs(r.v).toFixed(2)).style('font', '300 46px Fraunces').style('fill', r.c)
+      .style('opacity', 0).transition().delay(1700 + i * 400).style('opacity', 1);
+  });
+  svg.append('text').attr('x', cx - 30).attr('y', H - 10).attr('text-anchor', 'end').text('← cooler');
+  svg.append('text').attr('x', cx + 30).attr('y', H - 10).text('hotter →');
+}
+
+/* ---------- park cooling curve ---------- */
+function drawParks() {
+  const svg = d3.select('#parkcurve'); svg.selectAll('*').remove();
+  const W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 80, r: 30, t: 30, b: 70};
+  const d = Q2.cooling_profile.filter(p => p.dT != null);
+  const x = d3.scaleLinear([0, d3.max(d, p => p.d) + 30], [m.l, W - m.r]);
+  const y = d3.scaleLinear([Math.min(0, d3.min(d, p => p.dT)) - 0.2, d3.max(d, p => p.dT) + 0.4], [H - m.b, m.t]);
+  const defs = svg.append('defs'), gr = defs.append('linearGradient').attr('id', 'pk').attr('x1', 0).attr('x2', 1);
+  gr.append('stop').attr('offset', '0%').attr('stop-color', '#5ec8c4'); gr.append('stop').attr('offset', '45%').attr('stop-color', '#ffc857'); gr.append('stop').attr('offset', '100%').attr('stop-color', '#ff6a3d');
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(7).tickSize(0).tickFormat(v => v === 0 ? 'park' : v + ' m')).selectAll('text').attr('dy', 18);
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(0).tickFormat(v => (v > 0 ? '+' : '') + v.toFixed(1) + '°')).call(g => g.select('.domain').remove());
+  const area = d3.area().x(p => x(p.d + 15)).y0(y(0)).y1(p => y(p.dT)).curve(d3.curveMonotoneX);
+  const clip = defs.append('clipPath').attr('id', 'pc').append('rect').attr('x', m.l).attr('y', 0).attr('height', H).attr('width', 0);
+  svg.append('path').datum(d).attr('d', area).attr('fill', 'url(#pk)').attr('opacity', .28).attr('clip-path', 'url(#pc)');
+  svg.append('path').datum(d).attr('d', area.lineY1()).attr('fill', 'none').attr('stroke', 'url(#pk)').attr('stroke-width', 5).attr('clip-path', 'url(#pc)');
+  clip.transition().delay(500).duration(2200).ease(d3.easeCubicInOut).attr('width', W);
+  svg.append('text').attr('x', m.l).attr('y', m.t - 10).text('temperature above the park interior');
+  const rows = Q2.parks.slice(0, 6), mx = d3.max(rows, r => r.cooling);
+  d3.select('#parklist').html('').selectAll('div').data(rows).join('div')
+    .style('margin-bottom', '26px').style('opacity', 0)
+    .html(r => `<div style="display:flex;justify-content:space-between;font:400 24px Fraunces;margin-bottom:8px"><span>${r.name}</span><span style="color:#5ec8c4">−${r.cooling.toFixed(1)}°</span></div><div style="height:6px;background:#ffffff12;border-radius:3px"><div style="height:6px;border-radius:3px;background:#5ec8c4;width:${r.cooling / mx * 100}%"></div></div>`)
+    .transition().delay((r, i) => 900 + i * 180).duration(700).style('opacity', 1);
+}
+
+/* ---------- districts: width = area, two views ---------- */
+const STRIPE = { mode: 'all', timer: null, built: false };
+const STRIPE_VIEWS = {
+  all: { val: d => d.lst, area: d => d.land_km2, axis: 'bar width = land area · height and colour = mean surface temperature of all land' },
+  built: { val: d => d.lst_built, area: d => d.built_km2, axis: 'bar width = built-up area · height and colour = surface temperature of built-up pixels only (≥ 50 % built)' },
+};
+function stripeLayout(mode) {
+  const v = STRIPE_VIEWS[mode], W = 1728, gap = 3;
+  const ds = E24.districts.filter(d => v.val(d) != null).sort((a, b) => v.val(a) - v.val(b));
+  const tot = d3.sum(ds, v.area), scale = (W - gap * (ds.length - 1)) / tot;
+  let x = 0; const pos = {};
+  ds.forEach(d => { const w = v.area(d) * scale; pos[d.name] = {x, w, v: v.val(d)}; x += w + gap; });
+  return {pos, order: ds};
+}
+function setStripes(mode) {
+  STRIPE.mode = mode;
+  const box = document.getElementById('stripes'), {pos, order} = stripeLayout(mode);
+  const all = E24.districts.flatMap(d => [d.lst, d.lst_built]).filter(x => x != null);
+  const lo = Math.floor(d3.min(all)) - 1, hi = Math.ceil(d3.max(all));
+  const hy = v => 0.14 + 0.86 * (v - lo) / (hi - lo);
+  box.querySelectorAll('.bar').forEach(el => {
+    const p = pos[el.dataset.name]; if (!p) { el.style.width = '0px'; return; }
+    el.style.left = p.x + 'px'; el.style.width = p.w + 'px';
+    el.style.height = (hy(p.v) * 100) + '%';
+    el.style.backgroundColor = heat(0.12 + 0.86 * (p.v - lo) / (hi - lo));
+    el.querySelector('b').textContent = p.v.toFixed(1) + '°';
+    el.querySelector('b').style.opacity = p.w >= 46 ? 1 : 0;
+    el.querySelector('span').style.opacity = p.w >= 24 ? 1 : 0;
+  });
+  const first = order[order.length - 1];
+  const t = document.getElementById('stripes-title');
+  t.style.opacity = 0;
+  setTimeout(() => {
+    t.innerHTML = mode === 'all'
+      ? `Averages crown the smallest districts: <em>${first.name}</em>, ${first.lst.toFixed(1)} °C`
+      : `On built-up ground alone, <em>${first.name}</em> runs hottest: ${first.lst_built.toFixed(1)} °C`;
+    t.style.opacity = 1;
+  }, 350);
+  document.getElementById('stripe-axis').textContent = STRIPE_VIEWS[mode].axis;
+  document.getElementById('sm-all').classList.toggle('on', mode === 'all');
+  document.getElementById('sm-built').classList.toggle('on', mode === 'built');
+}
+function drawStripes() {
+  const box = document.getElementById('stripes');
+  if (!STRIPE.built) {
+    E24.districts.forEach(d => {
+      const el = document.createElement('div'); el.className = 'bar'; el.dataset.name = d.name;
+      el.style.left = '864px'; el.style.width = '0px'; el.style.height = '0%';
+      el.innerHTML = `<b></b><span>${d.name}</span>`; box.appendChild(el);
+      el.addEventListener('pointermove', e => districtTip(e, d)); el.addEventListener('pointerleave', hideTip);
+    });
+    for (let i = 0; i < 3; i++) { const c = document.createElement('div'); c.className = 'call'; box.appendChild(c); }
+    const toggle = (m, e) => { e.stopPropagation(); clearTimeout(STRIPE.timer); setStripes(m); };
+    box.addEventListener('click', e => toggle(STRIPE.mode === 'all' ? 'built' : 'all', e));
+    document.getElementById('sm-all').addEventListener('click', e => toggle('all', e));
+    document.getElementById('sm-built').addEventListener('click', e => toggle('built', e));
+    STRIPE.built = true;
+  }
+  clearTimeout(STRIPE.timer);
+  requestAnimationFrame(() => setStripes('all'));
+  STRIPE.timer = setTimeout(() => setStripes('built'), 5200);
+}
+
+/* ---------- thermometers ---------- */
+function drawThermo() {
+  const svg = d3.select('#thermo'); svg.selectAll('*').remove();
+  const H = +svg.attr('height');
+  const rows = [{k: 'newly built', v: NM.dlst_developed, c: '#ff3d73'}, {k: 'left alone', v: NM.dlst_stable, c: '#9aa0a8'}];
+  const lo = Math.min(0, ...rows.map(r => r.v)) - 0.5, hi = Math.max(...rows.map(r => r.v)) + 0.8;
+  const y = d3.scaleLinear([lo, hi], [H - 320, 120]);
+  svg.append('text').attr('x', 0).attr('y', 40).text('surface warming, 2014–15 → 2024–25').style('fill', '#9aa0a8');
+  rows.forEach((r, i) => {
+    const x = 90 + i * 210;
+    svg.append('rect').attr('x', x - 22).attr('y', y(hi)).attr('width', 44).attr('height', y(lo) - y(hi)).attr('rx', 22).attr('fill', '#ffffff0d').attr('stroke', '#ffffff22');
+    svg.append('circle').attr('cx', x).attr('cy', y(lo) + 30).attr('r', 42).attr('fill', r.c).style('filter', `drop-shadow(0 0 20px ${r.c})`);
+    svg.append('rect').attr('x', x - 12).attr('width', 24).attr('rx', 12).attr('fill', r.c).attr('y', y(lo)).attr('height', 0)
+      .transition().delay(600 + i * 300).duration(1800).ease(d3.easeCubicOut).attr('y', y(Math.max(lo, r.v))).attr('height', y(lo) - y(Math.max(lo, r.v)) + 10);
+    svg.append('text').attr('x', x).attr('y', y(r.v) - 26).attr('text-anchor', 'middle').text(f1(r.v) + '°')
+      .style('font', '300 48px Fraunces').style('fill', r.c).style('opacity', 0).transition().delay(2200 + i * 300).style('opacity', 1);
+    svg.append('text').attr('x', x).attr('y', y(lo) + 110).attr('text-anchor', 'middle').text(r.k).style('font', '400 22px Inter').style('fill', '#f3ede4');
+  });
+  svg.append('text').attr('x', 0).attr('y', H - 110).text('2024–25 summers were hotter everywhere.').style('fill', '#9aa0a8');
+  svg.append('text').attr('x', 0).attr('y', H - 80).text('The gap is what concrete added:').style('fill', '#9aa0a8');
+  svg.append('text').attr('x', 0).attr('y', H - 30)
+    .text(`${f1(NM.development_warming)} °C · 95 % CI ${NM.ci95[0].toFixed(1)} to ${NM.ci95[1].toFixed(1)}`).style('font', '400 30px Fraunces').style('fill', '#ff3d73');
+}
+
+/* =================== interaction layer =================== */
+const STAGE = document.getElementById('stage');
+const tip = document.createElement('div'); tip.id = 'tip'; STAGE.appendChild(tip);
+const fmt = (v, d = 1) => v == null ? '–' : v.toFixed(d);
+const sgn = (v, d = 1) => v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(d);
+function stageXY(e) { const r = STAGE.getBoundingClientRect(), k = r.width / 1920; return [(e.clientX - r.left) / k, (e.clientY - r.top) / k]; }
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const [x, y] = stageXY(e), w = tip.offsetWidth, h = tip.offsetHeight;
+  let tx = x + 24, ty = y + 24;
+  if (tx + w > 1890) tx = x - w - 24;
+  if (ty + h > 1050) ty = y - h - 24;
+  tip.style.transform = `translate(${Math.max(10, tx)}px,${Math.max(10, ty)}px)`;
+}
+function hideTip() { tip.style.opacity = 0; }
+const row = (k, v) => `<div class="row"><span class="k">${k}</span><span>${v}</span></div>`;
+
+/* ---------- 120 m grid for map readouts ---------- */
+let GRID = null;
+fetch('assets/grid.bin').then(r => r.arrayBuffer()).then(buf => {
+  const n = U.grid.w * U.grid.h, a = new Int16Array(buf, 0, 3 * n), b = new Uint8Array(buf, 6 * n, 4 * n);
+  GRID = {l14: a.subarray(0, n), l24: a.subarray(n, 2 * n), dl: a.subarray(2 * n), ndvi: b.subarray(0, n),
+          ndbi: b.subarray(n, 2 * n), dist: b.subarray(2 * n, 3 * n), chg: b.subarray(3 * n)};
+}).catch(() => {});
+function cellAt(fx, fy, crop) {
+  if (!GRID) return null;
+  const g = U.grid;
+  const c30 = crop ? crop[0] + fx * (crop[2] - crop[0]) : fx * g.full_w;
+  const r30 = crop ? crop[1] + fy * (crop[3] - crop[1]) : fy * g.full_h;
+  const c = Math.floor(c30 / 4), r = Math.floor(r30 / 4);
+  if (c < 0 || r < 0 || c >= g.w || r >= g.h) return null;
+  const i = r * g.w + c, v = a => a[i] === -32768 ? null : a[i] / 100, u = a => a[i] === 255 ? null : a[i] / 100 - 1;
+  return {lst14: v(GRID.l14), lst24: v(GRID.l24), dl: v(GRID.dl), ndvi: u(GRID.ndvi), ndbi: u(GRID.ndbi),
+          dist: GRID.dist[i] ? g.districts[GRID.dist[i] - 1] : null, chg: GRID.chg[i]};
+}
+function mapHover(el, render, crop) {
+  if (!el) return;
+  el.classList.add('hov');
+  el.addEventListener('pointermove', e => {
+    const r = el.getBoundingClientRect(), c = cellAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, crop);
+    if (!c || c.lst24 == null) { hideTip(); if (el._off) el._off(); return; }
+    showTip(e, render(c));
+  });
+  el.addEventListener('pointerleave', () => { hideTip(); if (el._off) el._off(); });
+}
+const lstTip = c => `<div class="tag">summer 2024–25</div><b>${fmt(c.lst24)} °C</b>${row('district', c.dist || '–')}${row('greenness', fmt(c.ndvi, 2))}${row('built-up index', fmt(c.ndbi, 2))}<div class="k" style="font-size:13px;margin-top:6px">${U.grid.cell_m} m cell average</div>`;
+const swipeTip = c => `<div class="tag">${c.dist || 'Hong Kong'}</div><b>${sgn(c.dl)} °C</b>${row('2014–15', fmt(c.lst14) + ' °C')}${row('2024–25', fmt(c.lst24) + ' °C')}<div class="k" style="font-size:13px;margin-top:6px">every pixel warmed ${sgn(U.q1_districts.hk_mean_dlst)} °C on average</div>`;
+const CHG = ['no clear change', 'unchanged', 'newly built', 'greened'];
+const changeTip = c => `<div class="tag" style="color:${c.chg === 2 ? '#ff3d73' : c.chg === 3 ? '#4dd9b3' : '#9aa0a8'}">${CHG[c.chg] || '–'}</div><b>${sgn(c.dl)} °C</b>${row('district', c.dist || '–')}${row('2024–25 surface', fmt(c.lst24) + ' °C')}`;
+
+mapHover(document.querySelector('#s-title .bg'), lstTip);
+mapHover(document.querySelector('#s-hook .bg'), c => `<div class="tag">${fmt(c.lst24)} °C · ${c.dist || ''}</div>${row('vs city mean', sgn(c.lst24 - E24.lst_mean) + ' °C')}`);
+const pm = document.getElementById('portrait-map');
+mapHover(pm, c => {
+  d3.selectAll('#portrait-map svg path').attr('stroke', d => d && d.name === c.dist ? '#ffffffcc' : '#ffffff1c').attr('stroke-width', d => d && d.name === c.dist ? 3 : 1.2);
+  return lstTip(c);
+});
+pm._off = () => d3.selectAll('#portrait-map svg path').attr('stroke', '#ffffff1c').attr('stroke-width', 1.2);
+mapHover(document.getElementById('swipe1'), swipeTip);
+mapHover(document.querySelector('#change-wrap img'), changeTip, U.grid.nm_crop);
+mapHover(document.getElementById('swipe2'), swipeTip, U.grid.nm_crop);
+
+/* MODIS day/night: linked crosshair on both maps */
+document.querySelectorAll('.mfig img').forEach(img => {
+  img.addEventListener('pointermove', e => {
+    const r = img.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    const M = U.modis, rr = Math.floor(fy * M.night.length), cc = Math.floor(fx * M.night[0].length);
+    const n = (M.night[rr] || [])[cc], d = (M.day[rr] || [])[cc];
+    if (n == null && d == null) { hideTip(); document.querySelectorAll('.mk').forEach(m => m.style.opacity = 0); return; }
+    document.querySelectorAll('.mfig').forEach(f => {
+      const mk = f.querySelector('.mk'), im = f.querySelector('img');
+      mk.style.left = (fx * im.offsetWidth) + 'px'; mk.style.top = (fy * im.offsetHeight) + 'px'; mk.style.opacity = 1;
+    });
+    showTip(e, `<div class="tag">MODIS 1 km cell</div>${row('day ≈10:30', fmt(d) + ' °C')}${row('night ≈22:30', fmt(n) + ' °C')}${row('cools by', d != null && n != null ? fmt(d - n) + ' °C' : '–')}`);
+  });
+  img.addEventListener('pointerleave', () => { hideTip(); document.querySelectorAll('.mk').forEach(m => m.style.opacity = 0); });
+});
+
+/* layers: hover a layer or its label to isolate it */
+{
+  const stack = document.querySelector('#s-layers .stack');
+  const on = l => { stack.classList.add('f'); stack.querySelectorAll('.layer,.tag').forEach(x => x.classList.toggle('on', x.classList.contains(l) || x.dataset.l === l)); };
+  const off = () => { stack.classList.remove('f'); stack.querySelectorAll('.on').forEach(x => x.classList.remove('on')); };
+  ['l1', 'l2', 'l3'].forEach(l => {
+    stack.querySelectorAll(`.${l}, .tag[data-l="${l}"]`).forEach(el => { el.addEventListener('pointerenter', () => on(l)); el.addEventListener('pointerleave', off); });
+  });
+}
+
+/* ---------- pulse hover ---------- */
+function pulseHover() {
+  const svg = d3.select('#pulse'), W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 70, r: 40, t: 20, b: 50};
+  const ys = T.yearly, x = d3.scaleLinear([2013.6, 2026], [m.l, W - m.r]);
+  const guide = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).attr('stroke', '#ffffff55').attr('stroke-dasharray', '4 6').style('opacity', 0);
+  svg.append('rect').attr('x', m.l).attr('y', 0).attr('width', W - m.l - m.r).attr('height', H).attr('fill', 'transparent').attr('class', 'hov')
+    .on('pointermove', e => {
+      const yr = x.invert(d3.pointer(e)[0]) - 0.5, d = ys.reduce((a, b) => Math.abs(b.year - yr) < Math.abs(a.year - yr) ? b : a);
+      guide.attr('x1', x(d.year + 0.5)).attr('x2', x(d.year + 0.5)).style('opacity', 1);
+      showTip(e, `<div class="tag">summer ${d.year}</div><b>${fmt(d.uhi)} °C gap</b>${row('built-up', fmt(d.urban) + ' °C')}${row('forest', fmt(d.rural) + ' °C')}${row('clear scenes', d.n)}`);
+    })
+    .on('pointerleave', () => { guide.style('opacity', 0); hideTip(); });
+}
+
+/* ---------- scatter with greenness / concrete toggle ---------- */
+const SC = {mode: 'ndvi'};
+function binned(pts, key, step) {
+  const g = d3.groups(pts, p => Math.floor(p[key] / step));
+  return g.filter(([, a]) => a.length >= 25).map(([k, a]) => ({x: (k + 0.5) * step, y: d3.mean(a, p => p.t)})).sort((a, b) => a.x - b.x);
+}
+function drawScatter2(mode) {
+  SC.mode = mode;
+  const svg = d3.select('#scatter'), W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 90, r: 30, t: 30, b: 80};
+  const pts = Q2.sample.map(d => ({n: d[0], b: d[1], t: d[2]}));
+  const key = mode === 'ndvi' ? 'n' : 'b';
+  const x = mode === 'ndvi' ? d3.scaleLinear([-0.1, 0.9], [m.l, W - m.r]) : d3.scaleLinear([-0.45, 0.25], [m.l, W - m.r]);
+  const y = d3.scaleLinear(d3.extent(pts, d => d.t), [H - m.b, m.t]).nice();
+  const fresh = svg.select('g.pts').empty();
+  if (fresh) {
+    svg.selectAll('*').remove();
+    svg.append('g').attr('class', 'axis x').attr('transform', `translate(0,${H - m.b})`);
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickSize(0).tickFormat(d => d + '°')).call(g => g.select('.domain').remove());
+    svg.append('text').attr('class', 'xl').attr('x', W - m.r).attr('y', H - 20).attr('text-anchor', 'end');
+    svg.append('text').attr('x', m.l).attr('y', m.t - 8).text('surface temperature, °C');
+    svg.append('g').attr('class', 'pts').selectAll('circle').data(pts).join('circle')
+      .attr('cx', W / 2).attr('cy', H / 2).attr('r', 0).attr('fill', d => heat((d.t - LO) / (HI - LO))).attr('opacity', .75);
+    svg.append('path').attr('class', 'fit').attr('fill', 'none').attr('stroke-width', 6);
+    const ring = svg.append('circle').attr('class', 'ring').attr('r', 9).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 2).style('opacity', 0);
+    svg.append('rect').attr('class', 'hov').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+      .on('pointermove', e => {
+        const [px, py] = d3.pointer(e), q = SC.qt && SC.qt.find(px, py, 18);
+        if (!q) { ring.style('opacity', 0); hideTip(); return; }
+        ring.attr('cx', SC.x(q[SC.key])).attr('cy', SC.y(q.t)).style('opacity', 1);
+        showTip(e, `<div class="tag">one 30 m pixel</div><b>${fmt(q.t)} °C</b>${row('greenness (NDVI)', fmt(q.n, 2))}${row('built-up (NDBI)', fmt(q.b, 2))}`);
+      })
+      .on('pointerleave', () => { ring.style('opacity', 0); hideTip(); });
+  }
+  svg.select('g.axis.x').call(d3.axisBottom(x).ticks(6).tickSize(0)).selectAll('text').attr('dy', 18);
+  svg.select('text.xl').text(mode === 'ndvi' ? 'greenness (NDVI) →' : 'concrete (NDBI) →');
+  svg.selectAll('g.pts circle').transition().delay(() => fresh ? Math.random() * 1200 : Math.random() * 300).duration(fresh ? 1200 : 900).ease(d3.easeCubicOut)
+    .attr('cx', d => x(d[key])).attr('cy', d => y(d.t)).attr('r', 3.6);
+  const col = mode === 'ndvi' ? '#5ec8c4' : '#ff6a3d';
+  const c = binned(pts, key, mode === 'ndvi' ? 0.05 : 0.04);
+  const fit = svg.select('path.fit').attr('stroke', col).style('filter', `drop-shadow(0 0 12px ${col})`)
+    .attr('d', d3.line().x(d => x(d.x)).y(d => y(d.y)).curve(d3.curveBasis)(c));
+  const L = fit.node().getTotalLength();
+  fit.attr('stroke-dasharray', L).attr('stroke-dashoffset', L).transition().delay(fresh ? 1500 : 700).duration(1600).attr('stroke-dashoffset', 0);
+  Object.assign(SC, {x, y, key, qt: d3.quadtree(pts, d => x(d[key]), d => y(d.t))});
+  const r = mode === 'ndvi' ? Q2.r_ndvi : Q2.r_ndbi;
+  document.getElementById('r-ndvi').textContent = (r < 0 ? '−' : '+') + Math.abs(r).toFixed(2);
+  document.querySelector('#s-scatter .stat .num').style.color = col;
+  document.getElementById('scatter-what').textContent = mode === 'ndvi' ? 'Heat vs greenness (NDVI)' : 'Heat vs concrete (NDBI)';
+  document.getElementById('scatter-lede').innerHTML = mode === 'ndvi'
+    ? `The greener the pixel, the cooler the ground. <b>R² = ${Q2.ols.r2.toFixed(2)}</b> once concrete is added.`
+    : `The more concrete, the hotter the ground: the stronger of the two signals.`;
+  document.querySelectorAll('#scatter-mode button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+}
+document.querySelectorAll('#scatter-mode button').forEach(b => b.addEventListener('click', () => drawScatter2(b.dataset.m)));
+
+/* ---------- tug hover ---------- */
+function tugHover() {
+  const info = [
+    {k: 'Greenness · NDVI', s: Q2.ols.std_b_ndvi, raw: Q2.ols.b_ndvi, u: 'per NDVI unit'},
+    {k: 'Concrete · NDBI', s: Q2.ols.std_b_ndbi, raw: Q2.ols.b_ndbi, u: 'per NDBI unit'}];
+  d3.selectAll('#tug rect').each(function (_, i) {
+    const d = info[i]; if (!d) return;
+    d3.select(this).classed('hov', true).on('pointermove', e => showTip(e,
+      `<div class="tag">${d.k}</div><b>${sgn(d.s, 2)} SD</b>${row('one SD more →', sgn(d.s, 2) + ' SD of heat')}${row('raw effect', sgn(d.raw, 1) + ' °C ' + d.u)}${row('model R²', fmt(Q2.ols.r2, 2))}`))
+      .on('pointerleave', hideTip);
+  });
+}
+
+/* ---------- parks hover ---------- */
+function parksHover() {
+  const svg = d3.select('#parkcurve'), W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 80, r: 30, t: 30, b: 70};
+  const d = Q2.cooling_profile.filter(p => p.dT != null);
+  const x = d3.scaleLinear([0, d3.max(d, p => p.d) + 30], [m.l, W - m.r]);
+  const y = d3.scaleLinear([Math.min(0, d3.min(d, p => p.dT)) - 0.2, d3.max(d, p => p.dT) + 0.4], [H - m.b, m.t]);
+  const dot = svg.append('circle').attr('r', 9).attr('fill', '#fff').style('opacity', 0);
+  svg.append('rect').attr('class', 'hov').attr('x', m.l).attr('y', 0).attr('width', W - m.l - m.r).attr('height', H - m.b).attr('fill', 'transparent')
+    .on('pointermove', e => {
+      const dd = x.invert(d3.pointer(e)[0]) - 15, p = d.reduce((a, b) => Math.abs(b.d - dd) < Math.abs(a.d - dd) ? b : a);
+      dot.attr('cx', x(p.d + 15)).attr('cy', y(p.dT)).style('opacity', 1);
+      showTip(e, p.d === 0 ? `<div class="tag">inside the park</div><b>baseline</b>` :
+        `<div class="tag">${p.d}–${p.d + 30} m from the park edge</div><b>${sgn(p.dT)} °C</b><div class="k">warmer than the park interior</div>`);
+    })
+    .on('pointerleave', () => { dot.style('opacity', 0); hideTip(); });
+  d3.selectAll('#parklist > div').each(function (_, i) {
+    const p = Q2.parks[i];
+    d3.select(this).style('cursor', 'default').on('pointermove', e => showTip(e,
+      `<div class="tag">${p.name}</div><b>−${fmt(p.cooling)} °C</b>${row('inside the park', fmt(p.park_lst) + ' °C')}${row('streets within 300 m', fmt(p.ring_lst) + ' °C')}${row('area', fmt(p.area_ha, 0) + ' ha')}${row('greenness', fmt(p.ndvi, 2))}`))
+      .on('pointerleave', hideTip);
+  });
+}
+
+/* ---------- district bars ---------- */
+function districtTip(e, d) {
+  showTip(e, `<div class="tag">${d.name}</div><b>${fmt(STRIPE.mode === 'all' ? d.lst : d.lst_built)} °C</b>${row('whole district', fmt(d.lst) + ' °C')}${row('built-up ground', fmt(d.lst_built) + ' °C')}${row('land area', fmt(d.land_km2, 0) + ' km²')}${row('built-up area', fmt(d.built_km2, 1) + ' km²')}${row('hot-spot area', fmt(d.hotspot_km2, 1) + ' km²')}`);
+}
+
+/* ---------- thermometers hover ---------- */
+function thermoHover() {
+  const info = [{k: 'Newly built', v: NM.dlst_developed, a: NM.developed_km2}, {k: 'Left alone', v: NM.dlst_stable, a: NM.stable_km2}];
+  const svg = d3.select('#thermo');
+  info.forEach((d, i) => {
+    svg.append('rect').attr('class', 'hov').attr('x', 90 + i * 210 - 60).attr('y', 90).attr('width', 120).attr('height', 640).attr('fill', 'transparent')
+      .on('pointermove', e => showTip(e, `<div class="tag">${d.k}</div><b>${sgn(d.v)} °C</b>${row('area', fmt(d.a, 1) + ' km²')}${row('period', '2014–15 → 2024–25')}`))
+      .on('pointerleave', hideTip);
+  });
+}
+
+/* ---------- where the heat grew ---------- */
+const WARM = {mode: 'rel'};
+const WARM_VIEWS = {
+  rel: {f: d => d.rel, title: t => `<em>${t.name}</em> heated fastest: ${sgn(t.rel)} °C beyond the Hong Kong average`,
+        foot: `0 = Hong Kong-wide change (${sgn(U.q1_districts.hk_mean_dlst)} °C: the 2024–25 summers were hotter everywhere)`},
+  rel_built: {f: d => d.rel_built, title: t => `On built-up ground, <em>${t.name}</em> warmed ${sgn(t.rel_built)} °C more than the city`,
+        foot: `0 = change of all built-up ground in Hong Kong (${sgn(U.q1_districts.hk_mean_dlst_built)} °C)`},
+  dlst: {f: d => d.dlst, title: t => `Every district warmed; <em>${t.name}</em> most, by ${sgn(t.dlst)} °C`,
+        foot: 'raw change in mean summer surface temperature, 2014–15 → 2024–25'},
+};
+function drawWarm(mode) {
+  WARM.mode = mode;
+  const v = WARM_VIEWS[mode], svg = d3.select('#warm'), W = +svg.attr('width'), H = +svg.attr('height');
+  const ds = U.q1_districts.districts.filter(d => v.f(d) != null).sort((a, b) => v.f(b) - v.f(a));
+  const rowH = (H - 50) / ds.length, labW = 300;
+  const ext = d3.extent(ds, v.f), lo = Math.min(0, ext[0]), hi = Math.max(0, ext[1]);
+  const pad = (hi - lo) * 0.12;
+  const x = d3.scaleLinear([lo - (lo < 0 ? pad : 0), hi + pad], [labW + 20, W - 90]);
+  if (svg.select('g.rows').empty()) {
+    svg.selectAll('*').remove();
+    svg.append('line').attr('class', 'zero').attr('y1', 0).attr('y2', H - 50).attr('stroke', '#ffffff55');
+    svg.append('text').attr('class', 'foot').attr('x', labW + 20).attr('y', H - 12);
+    svg.append('g').attr('class', 'rows');
+  }
+  svg.select('line.zero').transition().duration(900).attr('x1', x(0)).attr('x2', x(0));
+  svg.select('text.foot').text(v.foot);
+  const g = svg.select('g.rows').selectAll('g.r').data(ds, d => d.name).join(enter => {
+    const r = enter.append('g').attr('class', 'r hov').attr('transform', (d, i) => `translate(0,${i * rowH})`).style('opacity', 0);
+    r.append('text').attr('class', 'nm').attr('x', labW).attr('y', rowH / 2 + 6).attr('text-anchor', 'end').style('font', '400 22px Fraunces').style('fill', '#f3ede4').text(d => d.name);
+    r.append('rect').attr('class', 'bar').attr('y', 5).attr('height', rowH - 10).attr('rx', 3).attr('x', x(0)).attr('width', 0);
+    r.append('text').attr('class', 'val').attr('y', rowH / 2 + 6);
+    r.append('rect').attr('class', 'hit').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', 'transparent');
+    return r;
+  });
+  g.on('pointermove', (e, d) => showTip(e, `<div class="tag">${d.name}</div><b>${sgn(v.f(d), 2)} °C</b>${row('raw change', sgn(d.dlst, 2) + ' °C')}${row('beyond HK average', sgn(d.rel, 2) + ' °C')}${row('built-up ground, beyond', sgn(d.rel_built, 2) + ' °C')}${row('newly built', fmt(d.developed_km2, 1) + ' km²')}${row('greened', fmt(d.greened_km2, 1) + ' km²')}`))
+   .on('pointerleave', hideTip);
+  g.transition().duration(1000).delay((d, i) => i * 25).style('opacity', 1).attr('transform', (d, i) => `translate(0,${i * rowH})`);
+  const colr = d => v.f(d) >= 0 ? heat(0.45 + 0.5 * Math.min(1, v.f(d) / (hi || 1))) : '#5ec8c4';
+  g.select('rect.bar').transition().duration(1000).delay((d, i) => 200 + i * 25)
+    .attr('x', d => Math.min(x(0), x(v.f(d)))).attr('width', d => Math.abs(x(v.f(d)) - x(0))).attr('fill', colr);
+  g.select('text.val').transition().duration(1000).delay((d, i) => 200 + i * 25)
+    .attr('x', d => v.f(d) >= 0 ? x(v.f(d)) + 12 : x(v.f(d)) - 12).attr('text-anchor', d => v.f(d) >= 0 ? 'start' : 'end')
+    .text(d => sgn(v.f(d)) + '°').style('fill', d => v.f(d) >= 0 ? '#ffc857' : '#5ec8c4').style('font', '400 18px JetBrains Mono');
+  const t = document.getElementById('warm-title'); t.style.opacity = 0;
+  setTimeout(() => { t.innerHTML = v.title(ds[0]); t.style.opacity = 1; }, 250);
+  document.querySelectorAll('#warm-mode button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+}
+document.querySelectorAll('#warm-mode button').forEach(b => b.addEventListener('click', () => drawWarm(b.dataset.m)));
+
+/* =================== a day in a district: sun, moon, sky =================== */
+const DAY = {t: 14, playing: true, raf: null, last: 0, district: 'Yau Tsim Mong', hover: false};
+const DI = U.diurnal;
+const RISE = 5.75, SET = 19.0;          // Hong Kong summer sunrise / sunset, local time
+function passes(src) {
+  return Object.entries(DI.passes).map(([k, h]) => ({h, v: src[k]})).filter(p => p.v != null).sort((a, b) => a.h - b.h);
+}
+function valAt(pts, t) {                 // periodic cubic Hermite through the passes
+  const n = pts.length, P = i => { const k = ((i % n) + n) % n, wrap = Math.floor(i / n) * 24; return {h: pts[k].h + wrap, v: pts[k].v}; };
+  let i = 0; while (i < n && pts[i].h <= t) i++;
+  const a = P(i - 1), b = P(i), am = P(i - 2), bp = P(i + 1);
+  const tt = t < a.h ? t + 24 : t;
+  const ma = (b.v - am.v) / (b.h - am.h), mb = (bp.v - a.v) / (bp.h - a.h), dh = b.h - a.h, s = (tt - a.h) / dh;
+  const h00 = 2 * s ** 3 - 3 * s ** 2 + 1, h10 = s ** 3 - 2 * s ** 2 + s, h01 = -2 * s ** 3 + 3 * s ** 2, h11 = s ** 3 - s ** 2;
+  return h00 * a.v + h10 * dh * ma + h01 * b.v + h11 * dh * mb;
+}
+const SKY = [[0, '#03040d', '#0a1030'], [4.6, '#05081a', '#161c40'], [5.5, '#1b1838', '#7a3f4a'], [6.3, '#2a3f6e', '#e0885a'],
+  [8, '#24508a', '#8cb3d6'], [12, '#1f5fa3', '#a3c9e6'], [16.8, '#2a5590', '#c9b48a'], [18.4, '#3a2f5a', '#e5734a'],
+  [19.4, '#141633', '#5a2f45'], [20.6, '#05071a', '#101634'], [24, '#03040d', '#0a1030']];
+function skyAt(t) {
+  let i = 0; while (SKY[i + 1][0] < t) i++;
+  const [h0, a0, b0] = SKY[i], [h1, a1, b1] = SKY[i + 1], k = (t - h0) / (h1 - h0);
+  return [d3.interpolateRgb(a0, a1)(k), d3.interpolateRgb(b0, b1)(k)];
+}
+const rnd = (() => { let s = 9083; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+const STARS = Array.from({length: 240}, () => ({x: rnd() * 1920, y: rnd() * 600, r: rnd() * 1.6 + .3, p: rnd() * 6.28}));
+const SKYLINE = (() => {
+  const out = []; let x = -10;
+  while (x < 1930) {
+    const w = 26 + rnd() * 70, mid = 1 - Math.abs(x - 1100) / 1300;
+    const h = 40 + rnd() * 120 + mid * rnd() * 230;
+    const win = [];
+    for (let yy = 625 - h + 10; yy < 618; yy += 14) for (let xx = x + 6; xx < x + w - 8; xx += 11) if (rnd() < .42) win.push([xx, yy, rnd()]);
+    out.push({x, w, h, win}); x += w + rnd() * 6;
+  }
+  return out;
+})();
+const HZ = 625;
+function drawSky(t) {
+  const cv = document.getElementById('sky'), c = cv.getContext('2d'), [top, hor] = skyAt(t);
+  const g = c.createLinearGradient(0, 0, 0, HZ); g.addColorStop(0, top); g.addColorStop(1, hor);
+  c.fillStyle = g; c.fillRect(0, 0, 1920, HZ);
+  const dayK = t > RISE && t < SET ? Math.sin(Math.PI * (t - RISE) / (SET - RISE)) : 0;
+  const night = Math.max(0, Math.min(1, 1 - dayK * 4 - ((t > RISE - .6 && t < RISE) || (t > SET && t < SET + .6) ? .5 : 0)));
+  const now = performance.now() / 1000;
+  for (const s of STARS) { c.globalAlpha = night * (.4 + .6 * Math.abs(Math.sin(now * 1.3 + s.p))); c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x, s.y, s.r, 0, 6.283); c.fill(); }
+  c.globalAlpha = 1;
+  // arc
+  const cx = 960, rx = 760, ry = 470;
+  c.setLineDash([4, 12]); c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 2;
+  c.beginPath(); c.ellipse(cx, HZ, rx, ry, 0, Math.PI, 2 * Math.PI); c.stroke(); c.setLineDash([]);
+  const isDay = t >= RISE && t <= SET;
+  const frac = isDay ? (t - RISE) / (SET - RISE) : ((t - SET + 24) % 24) / (24 - (SET - RISE));
+  const ang = Math.PI * frac, bx = cx - rx * Math.cos(ang), by = HZ - ry * Math.sin(ang);
+  if (isDay) {
+    const low = 1 - Math.sin(ang), core = d3.interpolateRgb('#fff7d6', '#ffb35c')(low);
+    const glow = c.createRadialGradient(bx, by, 0, bx, by, 260);
+    glow.addColorStop(0, `rgba(255,214,140,${.55 - low * .15})`); glow.addColorStop(1, 'rgba(255,190,110,0)');
+    c.fillStyle = glow; c.beginPath(); c.arc(bx, by, 260, 0, 6.283); c.fill();
+    c.fillStyle = core; c.shadowColor = core; c.shadowBlur = 60; c.beginPath(); c.arc(bx, by, 54, 0, 6.283); c.fill(); c.shadowBlur = 0;
+  } else {
+    const glow = c.createRadialGradient(bx, by, 0, bx, by, 180);
+    glow.addColorStop(0, 'rgba(200,215,255,.28)'); glow.addColorStop(1, 'rgba(200,215,255,0)');
+    c.fillStyle = glow; c.beginPath(); c.arc(bx, by, 180, 0, 6.283); c.fill();
+    c.fillStyle = '#e8ecf5'; c.shadowColor = '#cfd8ff'; c.shadowBlur = 40; c.beginPath(); c.arc(bx, by, 44, 0, 6.283); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = top; c.beginPath(); c.arc(bx + 18, by - 10, 40, 0, 6.283); c.fill();     // crescent
+  }
+  // skyline with windows that light up at night
+  c.fillStyle = '#07080b';
+  for (const b of SKYLINE) c.fillRect(b.x, HZ - b.h, b.w, b.h + 2);
+  for (const b of SKYLINE) for (const [wx, wy, k] of b.win) {
+    const lit = night * (k > .35 ? 1 : 0) + (1 - night) * (k > .93 ? .5 : 0);
+    if (lit <= 0.02) continue;
+    c.fillStyle = `rgba(255,200,110,${.75 * lit})`; c.fillRect(wx, wy, 5, 7);
+  }
+  c.fillStyle = '#07080b'; c.fillRect(0, HZ, 1920, 1080 - HZ);
+}
+function dayChart() {
+  const svg = d3.select('#day-chart'), W = +svg.attr('width'), H = +svg.attr('height'), m = {l: 60, r: 20, t: 20, b: 40};
+  const dp = passes(DI.districts[DAY.district]), fp = passes(DI.forest);
+  const xs = d3.range(0, 24.001, 0.1);
+  const dc = xs.map(t => ({t, v: valAt(dp, t)})), fc = xs.map(t => ({t, v: valAt(fp, t)}));
+  const all = [...dc, ...fc].map(p => p.v);
+  const x = d3.scaleLinear([0, 24], [m.l, W - m.r]), y = d3.scaleLinear([d3.min(all) - .8, d3.max(all) + .8], [H - m.b, m.t]);
+  DAY.x = x; DAY.y = y; DAY.dp = dp; DAY.fp = fp;
+  if (svg.select('path.dist').empty()) {
+    svg.selectAll('*').remove();
+    svg.append('rect').attr('class', 'n1').attr('fill', '#1a1f4d').attr('opacity', .35);
+    svg.append('rect').attr('class', 'n2').attr('fill', '#1a1f4d').attr('opacity', .35);
+    svg.append('g').attr('class', 'axis x').attr('transform', `translate(0,${H - m.b})`);
+    svg.append('g').attr('class', 'axis y').attr('transform', `translate(${m.l},0)`);
+    const gr = svg.append('defs').append('linearGradient').attr('id', 'dayg').attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', 1);
+    gr.append('stop').attr('offset', '0%').attr('stop-color', '#ffc857'); gr.append('stop').attr('offset', '100%').attr('stop-color', '#ff3d73');
+    svg.append('path').attr('class', 'forest').attr('fill', 'none').attr('stroke', '#5ec8c4').attr('stroke-width', 3).attr('stroke-dasharray', '8 8');
+    svg.append('path').attr('class', 'dist').attr('fill', 'none').attr('stroke', 'url(#dayg)').attr('stroke-width', 6).style('filter', 'drop-shadow(0 0 10px #ff6a3d)');
+    svg.append('g').attr('class', 'dots');
+    svg.append('line').attr('class', 'scrub').attr('stroke', '#fff').attr('stroke-width', 2).attr('y1', m.t).attr('y2', H - m.b);
+    svg.append('circle').attr('class', 'now').attr('r', 10).attr('fill', '#fff');
+    svg.append('text').attr('class', 'lf').style('fill', '#5ec8c4').style('font', '400 16px JetBrains Mono');
+    svg.append('text').attr('class', 'ld').style('fill', '#ffc857').style('font', '400 16px JetBrains Mono');
+    svg.append('rect').attr('x', m.l).attr('y', 0).attr('width', W - m.l - m.r).attr('height', H).attr('fill', 'transparent')
+      .on('pointerdown pointermove', e => { if (e.type === 'pointermove' && !e.buttons && e.pointerType !== 'mouse') return; DAY.hover = true; DAY.t = Math.max(0, Math.min(23.99, DAY.x.invert(d3.pointer(e)[0]))); renderDay(); })
+      .on('pointerleave', () => { DAY.hover = false; });
+  }
+  svg.select('rect.n1').attr('x', x(0)).attr('y', m.t).attr('width', x(RISE) - x(0)).attr('height', H - m.t - m.b);
+  svg.select('rect.n2').attr('x', x(SET)).attr('y', m.t).attr('width', x(24) - x(SET)).attr('height', H - m.t - m.b);
+  svg.select('g.axis.x').call(d3.axisBottom(x).tickValues(d3.range(0, 25, 3)).tickSize(0).tickFormat(h => String(h % 24).padStart(2, '0') + ':00')).selectAll('text').attr('dy', 18);
+  svg.select('g.axis.y').transition().duration(600).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(v => v + '°')).call(g => g.select('.domain').remove()).selectAll('line').attr('stroke', '#ffffff12');
+  const line = d3.line().x(p => x(p.t)).y(p => y(p.v));
+  svg.select('path.dist').transition().duration(700).attr('d', line(dc));
+  svg.select('path.forest').transition().duration(700).attr('d', line(fc));
+  svg.select('text.lf').attr('x', W - m.r).attr('text-anchor', 'end').transition().duration(700).attr('y', y(fc[fc.length - 1].v) + 26).text('lowland forest');
+  svg.select('text.ld').attr('x', W - m.r).attr('text-anchor', 'end').transition().duration(700).attr('y', y(dc[dc.length - 1].v) - 16).text(DAY.district);
+  const dots = [...dp.map(p => ({...p, c: '#ffc857'})), ...fp.map(p => ({...p, c: '#5ec8c4'}))];
+  svg.select('g.dots').selectAll('circle').data(dots).join('circle').attr('r', 8).attr('fill', '#07080b').attr('stroke', d => d.c).attr('stroke-width', 3)
+    .transition().duration(700).attr('cx', d => x(d.h)).attr('cy', d => y(d.v));
+}
+function renderDay() {
+  const t = DAY.t, hh = Math.floor(t), mm = Math.floor((t - hh) * 60);
+  drawSky(t);
+  document.getElementById('day-clock').textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+  const v = valAt(DAY.dp, t), f = valAt(DAY.fp, t);
+  const near = Object.entries(DI.passes).find(([, h]) => Math.abs(h - t) < 0.25);
+  document.getElementById('day-read').innerHTML = `${DAY.district} · <b>${v.toFixed(1)} °C</b><small>${sgn(v - f)} °C vs lowland forest · ${near ? 'measured: ' + (near[0].startsWith('terra') ? 'Terra' : 'Aqua') + ' pass' : 'between passes (interpolated)'}</small>`;
+  const svg = d3.select('#day-chart');
+  svg.select('line.scrub').attr('x1', DAY.x(t)).attr('x2', DAY.x(t));
+  svg.select('circle.now').attr('cx', DAY.x(t)).attr('cy', DAY.y(v));
+}
+function dayLoop(now) {
+  if (!document.getElementById('s-day').classList.contains('active')) { DAY.raf = null; return; }
+  const dt = DAY.last ? (now - DAY.last) / 1000 : 0; DAY.last = now;
+  if (DAY.playing && !DAY.hover) DAY.t = (DAY.t + dt * 24 / 16) % 24;      // one day in 16 s
+  renderDay();
+  DAY.raf = requestAnimationFrame(dayLoop);
+}
+function drawDay() {
+  const sel = document.getElementById('day-district');
+  if (!sel.options.length) {
+    Object.keys(DI.districts).sort().forEach(n => sel.add(new Option(n, n, false, n === DAY.district)));
+    sel.addEventListener('change', () => { DAY.district = sel.value; dayChart(); renderDay(); });
+    document.getElementById('day-play').addEventListener('click', () => {
+      DAY.playing = !DAY.playing; document.getElementById('day-play').textContent = DAY.playing ? '❚❚ Pause' : '▶ Play';
+    });
+  }
+  dayChart(); DAY.last = 0; renderDay();
+  if (!DAY.raf) DAY.raf = requestAnimationFrame(dayLoop);
+}
+
+/* ---------- deck engine ---------- */
+const slides = [...document.querySelectorAll('.slide')];
+const enter = {
+  's-portrait': portraitOverlay, 's-pulse': () => { drawPulse(); pulseHover(); }, 's-scatter': () => drawScatter2(SC.mode), 's-tug': () => { drawTug(); tugHover(); },
+  's-parks': () => { drawParks(); parksHover(); }, 's-stripes': drawStripes, 's-nmswipe': () => { drawThermo(); thermoHover(); },
+  's-warm': () => drawWarm(WARM.mode), 's-day': drawDay,
+};
+const prog = document.getElementById('progress');
+let lastAct = null;
+slides.forEach((s, i) => {
+  const act = (s.dataset.act || '').split(' ·')[0];
+  if (i && act !== lastAct && /Act|Epilogue/.test(act)) { const g = document.createElement('span'); g.className = 'gap'; prog.appendChild(g); }
+  lastAct = act;
+  const sp = document.createElement('span'); sp.innerHTML = '<i></i>'; prog.appendChild(sp);
+});
+const bars = [...prog.querySelectorAll('span:not(.gap)')];
+let cur = -1;
+function go(n) {
+  n = Math.max(0, Math.min(slides.length - 1, n));
+  if (n === cur) return;
+  if (cur >= 0) slides[cur].classList.remove('active');
+  cur = n; const s = slides[n];
+  // restart CSS animations
+  s.querySelectorAll('.in').forEach(el => { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; });
+  s.classList.add('active');
+  bars.forEach((b, i) => b.classList.toggle('seen', i <= n));
+  document.getElementById('chrome-act').textContent = s.dataset.act || '';
+  document.getElementById('chrome-num').textContent = String(n + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
+  countUp(s);
+  enter[s.id] && enter[s.id]();
+  swipes[s.id] && swipes[s.id].play();
+  history.replaceState(null, '', '#' + (n + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('button, select') && [' ', 'Enter', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+  if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+  if (e.key === 'Home') go(0);
+  if (e.key === 'End') go(slides.length - 1);
+  if (e.key === 'f' || e.key === 'F') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+document.getElementById('stage').addEventListener('click', e => {
+  if (e.target.closest('[data-ix], button, select, .swipe, #stripes')) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  go(e.clientX - r.left > r.width * 0.3 ? cur + 1 : cur - 1);
+});
+let tx = null;
+document.addEventListener('touchstart', e => tx = e.touches[0].clientX, {passive: true});
+document.addEventListener('touchend', e => { if (tx == null) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 50) go(cur + (dx < 0 ? 1 : -1)); tx = null; });
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  document.getElementById('stage').style.transform = `translate(-50%,-50%) scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+go((parseInt(location.hash.slice(1)) || 1) - 1);
+</script>
+</body>
+</html>
